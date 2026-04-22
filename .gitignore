@@ -1,0 +1,34 @@
+# environment / secrets
+.env
+.venv/
+backend/.venv/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# node
+node_modules/
+dist/
+.vite/
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# editors
+.vscode/
+.idea/
+
+# coverage / cache
+coverage/
+.pytest_cache/
+.mypy_cache/
