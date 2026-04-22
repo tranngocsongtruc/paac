@@ -3,6 +3,10 @@
 # PAAC
 **Policy-Aware Agent Console**  
 A frontend + backend prototype for runtime governance of AI agents.
+- 🔗 Live demo: https://paac-five.vercel.app 
+- 🔗 Backend: https://paac.onrender.com/
+(for health check) https://paac.onrender.com/health 
+- 🔗 Repo: https://github.com/tranngocsongtruc/paac
 
 ## What PAAC demonstrates
 
