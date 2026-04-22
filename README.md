@@ -1,8 +1,6 @@
 # `README.md`
 
-```md
 # PAAC
-
 **Policy-Aware Agent Console**  
 A frontend + backend prototype for runtime governance of AI agents.
 
