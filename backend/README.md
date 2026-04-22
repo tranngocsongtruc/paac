@@ -52,11 +52,11 @@ uvicorn app:app --reload --port 8000
 
 Open:
 
-`/health`
-`/agents`
-`/policies`
-`/decisions`
-`/scenarios`
+- `/health`
+- `/agents`
+- `/policies`
+- `/decisions`
+- `/scenarios`
 
 Example:
 
@@ -65,30 +65,30 @@ Example:
 ## Endpoints
 
 ### Read endpoints
-`GET /health`
-`GET /agents`
-`GET /policies`
-`GET /decisions`
-`GET /scenarios`
-`GET /security-info`
+- `GET /health`
+- `GET /agents`
+- `GET /policies`
+- `GET /decisions`
+- `GET /scenarios`
+- `GET /security-info`
 
 ### Protected mutation endpoints
-`POST /auth/demo-login`
-`POST /auth/logout`
-`POST /evaluate-action`
+- `POST /auth/demo-login`
+- `POST /auth/logout`
+- `POST /evaluate-action`
 
 ## Demo login
 
 The login credentials come from `.env`:
 
-`DEMO_USERNAME`
-`DEMO_PASSWORD`
+- `DEMO_USERNAME`
+- `DEMO_PASSWORD`
 
 ## Deploy notes
 
 Recommended:
 
-backend on Render
-frontend on Vercel
+- backend on Render
+- frontend on Vercel
 
 In production, secrets should stay only in the backend environment and never be committed to Git.
