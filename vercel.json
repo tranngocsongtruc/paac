@@ -1,13 +1,13 @@
 {
   "rewrites": [
-    { "source": "/health", "destination": "https://your-backend-name.onrender.com/health" },
-    { "source": "/security-info", "destination": "https://your-backend-name.onrender.com/security-info" },
-    { "source": "/agents", "destination": "https://your-backend-name.onrender.com/agents" },
-    { "source": "/policies", "destination": "https://your-backend-name.onrender.com/policies" },
-    { "source": "/decisions", "destination": "https://your-backend-name.onrender.com/decisions" },
-    { "source": "/scenarios", "destination": "https://your-backend-name.onrender.com/scenarios" },
-    { "source": "/evaluate-action", "destination": "https://your-backend-name.onrender.com/evaluate-action" },
-    { "source": "/auth/demo-login", "destination": "https://your-backend-name.onrender.com/auth/demo-login" },
-    { "source": "/auth/logout", "destination": "https://your-backend-name.onrender.com/auth/logout" }
+    { "source": "/health", "destination": "https://paac.onrender.com/health" },
+    { "source": "/security-info", "destination": "https://paac.onrender.com/security-info" },
+    { "source": "/agents", "destination": "https://paac.onrender.com/agents" },
+    { "source": "/policies", "destination": "https://paac.onrender.com/policies" },
+    { "source": "/decisions", "destination": "https://paac.onrender.com/decisions" },
+    { "source": "/scenarios", "destination": "https://paac.onrender.com/scenarios" },
+    { "source": "/evaluate-action", "destination": "https://paac.onrender.com/evaluate-action" },
+    { "source": "/auth/demo-login", "destination": "https://paac.onrender.com/auth/demo-login" },
+    { "source": "/auth/logout", "destination": "https://paac.onrender.com/auth/logout" }
   ]
 }
