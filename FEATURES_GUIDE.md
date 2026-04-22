@@ -1,6 +1,5 @@
 # `FEATURES_GUIDE.md`
 
-```md
 # PAAC Features Guide
 
 **Policy-Aware Agent Console**  
