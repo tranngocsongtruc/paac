@@ -32,3 +32,6 @@ yarn-error.log*
 coverage/
 .pytest_cache/
 .mypy_cache/
+
+# local testing artifacts
+cookies.txt

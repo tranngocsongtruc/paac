@@ -9,12 +9,17 @@ import time
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Deque, Dict, List, Literal
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 
 APP_ENV = os.getenv("APP_ENV", "dev")
 ALLOWED_ORIGINS = [
@@ -112,6 +117,24 @@ class ActionRequest(StrictModel):
         cleaned = html.escape(value, quote=True)
         return cleaned[:240]
 
+class InvariantCheck(StrictModel):
+    id: str
+    name: str
+    status: Literal["passed", "failed", "skipped"]
+    source: str
+    detail: str
+
+# class DecisionRecord(StrictModel):
+#     trace_id: str
+#     timestamp: str
+#     agent_id: str
+#     tool: str
+#     decision: Decision
+#     reason: str
+#     matched_policies: List[str]
+#     required_approver: str | None = None
+#     latency_ms: int | None = None
+#     risk_flags: List[str] = []
 
 class DecisionRecord(StrictModel):
     trace_id: str
@@ -119,11 +142,18 @@ class DecisionRecord(StrictModel):
     agent_id: str
     tool: str
     decision: Decision
+    decision_title: str
     reason: str
+    human_explanation: str
+    next_step: str
+    safe_alternatives: List[str]
+    confidence: float
     matched_policies: List[str]
     required_approver: str | None = None
     latency_ms: int | None = None
     risk_flags: List[str] = []
+    invariant_checks: List[InvariantCheck] = []
+    ledger_status: Literal["recorded"] = "recorded"
 
 
 class LoginRequest(StrictModel):
@@ -168,27 +198,79 @@ AGENT_INDEX = {agent.id: agent for agent in AGENTS}
 
 DECISIONS: List[DecisionRecord] = [
     DecisionRecord(
+        # trace_id="tr_demo_1001",
+        # timestamp="2026-04-21T21:35:00Z",
+        # agent_id="agt_fin_001",
+        # tool="query_payroll_db",
+        # decision="allow",
+        # reason="Finance agent allowed to read internal payroll data for reporting.",
+        # matched_policies=["POL-001"],
+        # latency_ms=7,
+        # risk_flags=[],
         trace_id="tr_demo_1001",
         timestamp="2026-04-21T21:35:00Z",
         agent_id="agt_fin_001",
         tool="query_payroll_db",
         decision="allow",
+        decision_title="Policy POL-001 triggered",
         reason="Finance agent allowed to read internal payroll data for reporting.",
+        human_explanation="This action stays within the finance agent's approved workflow and keeps the data inside the organization.",
+        next_step="Proceed with the internal summary and record the decision in the audit trail.",
+        safe_alternatives=["Continue with internal reporting.", "Review the audit trace if needed."],
+        confidence=0.96,
         matched_policies=["POL-001"],
         latency_ms=7,
         risk_flags=[],
+        invariant_checks=[],
+        ledger_status="recorded",
     ),
     DecisionRecord(
+        # trace_id="tr_demo_1001",
+        # timestamp="2026-04-21T21:35:02Z",
+        # agent_id="agt_fin_001",
+        # tool="send_email",
+        # decision="require_approval",
+        # reason="Confidential payroll output cannot be emailed externally without HR approval.",
+        # matched_policies=["POL-017", "POL-022"],
+        # required_approver="hr_manager",
+        # latency_ms=9,
+        # risk_flags=["sensitive_data", "external_destination"],
         trace_id="tr_demo_1001",
         timestamp="2026-04-21T21:35:02Z",
         agent_id="agt_fin_001",
         tool="send_email",
         decision="require_approval",
+        decision_title="Policy POL-017 triggered",
         reason="Confidential payroll output cannot be emailed externally without HR approval.",
+        human_explanation="This request involves sensitive payroll data being sent externally. To protect against accidental data exposure, approval is required.",
+        next_step="Route this request to hr_manager for approval before execution.",
+        safe_alternatives=[
+            "Send only to internal recipients.",
+            "Redact payroll-sensitive fields before sharing.",
+            "Request HR approval before external distribution.",
+        ],
+        confidence=0.91,
         matched_policies=["POL-017", "POL-022"],
         required_approver="hr_manager",
         latency_ms=9,
         risk_flags=["sensitive_data", "external_destination"],
+        invariant_checks=[
+            InvariantCheck(
+                id="INV-DATA-CLASS",
+                name="Payroll data classification verified",
+                status="passed",
+                source="mock_data_catalog",
+                detail="Payroll-related resources must be treated as confidential.",
+            ),
+            InvariantCheck(
+                id="INV-APPROVAL-EVIDENCE",
+                name="External sensitive sharing approval verified",
+                status="failed",
+                source="mock_approval_registry",
+                detail="No approval record found for this external sensitive-data action.",
+            ),
+        ],
+        ledger_status="recorded",        
     ),
 ]
 
@@ -499,6 +581,125 @@ def evaluate_injection_risk(action: ActionRequest) -> List[str]:
 
     return sorted(set(risk_flags))
 
+def check_invariants(action: ActionRequest) -> List[Dict[str, str]]:
+    checks: List[Dict[str, str]] = []
+
+    agent = AGENT_INDEX.get(action.agent_id)
+
+    if agent:
+        checks.append({
+            "id": "INV-TOOL-ALLOWLIST",
+            "name": "Tool allowlist verified",
+            "status": "passed" if action.tool in set(agent.tools) else "failed",
+            "source": "agent_registry",
+            "detail": (
+                "Requested tool is registered for this agent."
+                if action.tool in set(agent.tools)
+                else "Requested tool is not registered for this agent."
+            ),
+        })
+
+    if "payroll" in action.target_resource.lower():
+        checks.append({
+            "id": "INV-DATA-CLASS",
+            "name": "Payroll data classification verified",
+            "status": "passed" if action.data_classification == "confidential" else "failed",
+            "source": "mock_data_catalog",
+            "detail": "Payroll-related resources must be treated as confidential.",
+        })
+
+    if action.recipient_domain == "external" and action.data_classification in {"confidential", "regulated"}:
+        checks.append({
+            "id": "INV-APPROVAL-EVIDENCE",
+            "name": "External sensitive sharing approval verified",
+            "status": "failed",
+            "source": "mock_approval_registry",
+            "detail": "No approval record found for this external sensitive-data action.",
+        })
+
+    return checks
+
+def build_human_explanation(
+    decision: Decision,
+    matched_policies: List[str],
+    risk_flags: List[str],
+    action: ActionRequest,
+) -> tuple[str, str, List[str], float]:
+    policy_title = (
+        f"Policy {matched_policies[0]} triggered"
+        if matched_policies
+        else "Default policy decision"
+    )
+
+    if "prompt_injection_signal" in risk_flags:
+        return (
+            "Policy POL-051 triggered",
+            "This request contains language that appears to override instructions or reveal protected information. To avoid unsafe tool use, the action is blocked before execution.",
+            [
+                "Remove instruction-override language.",
+                "Submit a clean business request.",
+                "Escalate to security if this came from external content.",
+            ],
+            0.88,
+        )
+
+    if action.data_classification in {"confidential", "regulated"} and action.recipient_domain == "external":
+        return (
+            policy_title,
+            "This request involves sensitive data being sent externally. To protect against accidental data exposure, approval is required before the action can proceed.",
+            [
+                "Send only to internal recipients.",
+                "Redact sensitive fields before sharing.",
+                "Request approval from the required approver.",
+            ],
+            0.91,
+        )
+
+    if not action.baseline_ok:
+        return (
+            "Policy POL-044 triggered",
+            "This tool call differs from the agent's normal behavior. Because unexpected tool use can indicate drift or misuse, the action needs review before execution.",
+            [
+                "Confirm the agent should have this capability.",
+                "Route to the agent owner for review.",
+                "Use an approved tool for this workflow.",
+            ],
+            0.82,
+        )
+
+    if decision == "allow":
+        return (
+            policy_title,
+            "This action matches the agent's allowed tools and current policy context. It can proceed without additional approval.",
+            [
+                "Continue with the action.",
+                "Review the audit trace if needed.",
+            ],
+            0.96,
+        )
+
+    return (
+        policy_title,
+        "The system could not confidently determine that this action is safe. It has been paused for review instead of being executed automatically.",
+        [
+            "Route to a human reviewer.",
+            "Provide additional verified context.",
+            "Retry with a narrower action.",
+        ],
+        0.65,
+    )
+
+
+def build_next_step(decision: Decision, approver: str | None) -> str:
+    if decision == "allow":
+        return "Proceed with the action and record the decision in the audit trail."
+
+    if decision == "require_approval":
+        if approver:
+            return f"Route this request to {approver} for approval before execution."
+        return "Route this request to the appropriate reviewer before execution."
+
+    return "Do not execute this action. Revise the request or escalate for review."
 
 @app.post("/evaluate-action")
 def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
@@ -545,6 +746,23 @@ def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
         reason = "Finance reporting workflow is permitted for internal analysis."
         matched_policies = ["POL-001"]
 
+    invariant_checks = check_invariants(request)
+
+    if any(check["status"] == "failed" for check in invariant_checks):
+        if decision == "allow":
+            decision = "require_approval"
+            reason = "One or more invariant checks failed before commit."
+            matched_policies = matched_policies or ["INV-CHECK"]
+
+    decision_title, human_explanation, safe_alternatives, confidence = build_human_explanation(
+        decision=decision,
+        matched_policies=matched_policies,
+        risk_flags=risk_flags,
+        action=request,
+    )
+
+    next_step = build_next_step(decision, approver)
+
     latency_ms = max(1, round((time.perf_counter() - start) * 1000))
     trace_id = f"tr_{uuid.uuid4().hex[:10]}"
 
@@ -559,6 +777,13 @@ def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
         required_approver=approver,
         latency_ms=latency_ms,
         risk_flags=risk_flags,
+        decision_title=decision_title,
+        human_explanation=human_explanation,
+        next_step=next_step,
+        safe_alternatives=safe_alternatives,
+        confidence=confidence,
+        invariant_checks=[InvariantCheck(**check) for check in invariant_checks],
+        ledger_status="recorded",
     )
 
     DECISIONS.insert(0, record)
@@ -574,4 +799,11 @@ def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
         "latency_ms": latency_ms,
         "request_digest": hashlib.sha256(str(request.model_dump()).encode("utf-8")).hexdigest()[:16],
         "request": request.model_dump(),
+        "decision_title": decision_title,
+        "human_explanation": human_explanation,
+        "next_step": next_step,
+        "safe_alternatives": safe_alternatives,
+        "confidence": confidence,
+        "invariant_checks": invariant_checks,
+        "ledger_status": "recorded",
     }

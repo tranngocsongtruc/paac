@@ -148,6 +148,7 @@ export default function RuntimeScreen({
   const [username, setUsername] = useState("demo");
   const [password, setPassword] = useState("");
   const [authMessage, setAuthMessage] = useState("Sign in to run protected evaluations.");
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -362,7 +363,7 @@ export default function RuntimeScreen({
           </div>
 
           <div className="space-y-3">
-            <div className={`border ${colors.border} ${colors.bg}`}>
+            {/* <div className={`border ${colors.border} ${colors.bg}`}>
               <div className={`p-3 border-b ${colors.border} flex items-center justify-between gap-3`}>
                 <h3 className={`text-xs font-semibold ${colors.text}`}>Decision Output</h3>
                 <span className={`px-2.5 py-1 text-[10px] font-bold ${decisionBadge(result?.decision)}`}>
@@ -440,6 +441,179 @@ export default function RuntimeScreen({
                   </div>
                 </div>
               </div>
+            </div> */}
+            <div className={`border ${colors.border} ${colors.bg}`}>
+              <div className={`p-3 border-b ${colors.border} flex items-center justify-between gap-3`}>
+                <h3 className={`text-xs font-semibold ${colors.text}`}>Decision Output</h3>
+                <span className={`px-2.5 py-1 text-[10px] font-bold ${decisionBadge(result?.decision)}`}>
+                  {result ? result.decision.replace("_", " ").toUpperCase() : "NO DECISION"}
+                </span>
+              </div>
+
+              <div className="p-3 space-y-3">
+                <div>
+                  <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                    Decision
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-semibold ${colors.text}`}>
+                      {result?.decision_title ?? "Run a scenario to see the runtime policy decision."}
+                    </span>
+
+                    {result?.human_explanation && (
+                      <button
+                        type="button"
+                        onClick={() => setIsExplanationOpen(true)}
+                        title={result.human_explanation.slice(0, 120)}
+                        className="text-[10px] text-[#2563EB] underline hover:text-[#1D4ED8]"
+                      >
+                        Explanation
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                    Reason
+                  </div>
+                  <div className={`text-xs mt-1 ${colors.text}`}>
+                    {result?.reason ?? "No decision has been evaluated yet."}
+                  </div>
+                </div>
+
+                {result?.next_step && (
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Next Step
+                    </div>
+                    <div className={`text-xs mt-1 ${colors.text}`}>
+                      {result.next_step}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Latency
+                    </div>
+                    <div className={`text-xs font-semibold mt-1 ${colors.text}`}>
+                      {typeof result?.latency_ms === "number" ? `${result.latency_ms} ms` : "—"}
+                    </div>
+                  </div>
+
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Confidence
+                    </div>
+                    <div className={`text-xs font-semibold mt-1 ${colors.text}`}>
+                      {typeof result?.confidence === "number" ? `${Math.round(result.confidence * 100)}%` : "—"}
+                    </div>
+                  </div>
+
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Approver
+                    </div>
+                    <div className={`text-xs font-semibold mt-1 ${colors.text}`}>
+                      {result?.required_approver ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Ledger
+                    </div>
+                    <div className={`text-xs font-semibold mt-1 ${colors.text}`}>
+                      {result?.ledger_status ?? "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                  <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                    Matched Policies
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {result?.matched_policies?.length ? (
+                      result.matched_policies.map((policy: string) => (
+                        <span
+                          key={policy}
+                          className={`px-2 py-0.5 text-[10px] ${colors.bgTertiary} ${colors.text}`}
+                        >
+                          {policy}
+                        </span>
+                      ))
+                    ) : (
+                      <span className={`text-xs ${colors.textSecondary}`}>—</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                  <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                    Risk Flags
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {result?.risk_flags?.length ? (
+                      result.risk_flags.map((flag: string) => (
+                        <span
+                          key={flag}
+                          className="px-2 py-0.5 text-[10px] bg-[#FEF3C7] text-[#92400E]"
+                        >
+                          {flag}
+                        </span>
+                      ))
+                    ) : (
+                      <span className={`text-xs ${colors.textSecondary}`}>none</span>
+                    )}
+                  </div>
+                </div>
+
+                {result?.safe_alternatives?.length ? (
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Safe Alternatives
+                    </div>
+                    <ul className={`mt-2 list-disc pl-4 space-y-1 text-xs ${colors.text}`}>
+                      {result.safe_alternatives.map((alternative: string) => (
+                        <li key={alternative}>{alternative}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {result?.invariant_checks?.length ? (
+                  <div className={`p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Invariant Checks
+                    </div>
+
+                    <div className="mt-2 space-y-2">
+                      {result.invariant_checks.map((check) => {
+                        const passed = check.status === "passed";
+                        return (
+                          <div key={check.id} className="flex items-start gap-2">
+                            <span className={passed ? "text-[#10B981]" : "text-[#EF4444]"}>
+                              {passed ? "✓" : "✕"}
+                            </span>
+                            <div className="min-w-0">
+                              <div className={`text-xs font-medium ${colors.text}`}>
+                                {check.name}
+                              </div>
+                              <div className={`text-[10px] ${colors.textSecondary}`}>
+                                {check.detail}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className={`border ${colors.border} ${colors.bg}`}>
@@ -453,6 +627,42 @@ export default function RuntimeScreen({
           </div>
         </div>
       </div>
+
+      {isExplanationOpen && result && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className={`${colors.bg} border ${colors.border} max-w-lg w-full p-4 shadow-xl`}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className={`text-sm font-semibold ${colors.text}`}>
+                  {result.decision_title}
+                </h3>
+                <p className={`mt-2 text-xs leading-relaxed ${colors.textSecondary}`}>
+                  {result.human_explanation}
+                </p>
+
+                {result.next_step && (
+                  <div className={`mt-4 p-3 border ${colors.border} ${colors.bgSecondary}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.14em] ${colors.textSecondary}`}>
+                      Next Step
+                    </div>
+                    <p className={`mt-1 text-xs ${colors.text}`}>
+                      {result.next_step}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsExplanationOpen(false)}
+                className={`text-xs ${colors.textSecondary} hover:underline`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}      
     </div>
   );
 }
