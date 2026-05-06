@@ -6,6 +6,7 @@ import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import Any, Deque, Dict, List, Literal
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +31,8 @@ from app.services.explanation_service import build_human_explanation, build_next
 from app.services.invariant_checker import check_invariants
 from app.services.policy_engine import evaluate_policy
 from app.services.risk_service import evaluate_injection_risk
+from app.database import init_db
+from app.services.audit_service import list_decisions_from_db, persist_decision
 
 SAFE_TEXT_RE = re.compile(r"^[A-Za-z0-9_\- .,:/@()#+]{1,120}$")
 PURPOSE_RE = re.compile(r"^[A-Za-z0-9_\- .,:/@()#+]{1,180}$")
@@ -39,6 +42,17 @@ TRACE_BUCKET: Dict[str, Deque[float]] = defaultdict(deque)
 Decision = Literal["allow", "block", "require_approval"]
 
 app = FastAPI(title="PAAC Backend", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(
+    title="PAAC API",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -176,6 +190,10 @@ def get_policies() -> List[Dict[str, Any]]:
 
 @app.get("/decisions")
 def get_decisions() -> List[Dict[str, Any]]:
+    db_decisions = list_decisions_from_db(MAX_DECISION_LOG)
+    if db_decisions:
+        return db_decisions
+
     return [decision.model_dump() for decision in DECISIONS[:MAX_DECISION_LOG]]
 
 
@@ -212,6 +230,8 @@ def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
     latency_ms = max(1, round((time.perf_counter() - start) * 1000))
     trace_id = f"tr_{uuid.uuid4().hex[:10]}"
 
+    request_digest = hashlib.sha256(str(request.model_dump()).encode("utf-8")).hexdigest()[:16]
+
     record = DecisionRecord(
         trace_id=trace_id,
         timestamp=utc_now_iso(),
@@ -232,6 +252,13 @@ def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
         ledger_status="recorded",
     )
 
+    persist_decision(
+        trace_id=trace_id,
+        request_digest=request_digest,
+        action=request,
+        record=record,
+    )
+
     DECISIONS.insert(0, record)
     del DECISIONS[MAX_DECISION_LOG:]
 
@@ -243,7 +270,7 @@ def evaluate_action(request: ActionRequest) -> Dict[str, Any]:
         "required_approver": approver,
         "risk_flags": risk_flags,
         "latency_ms": latency_ms,
-        "request_digest": hashlib.sha256(str(request.model_dump()).encode("utf-8")).hexdigest()[:16],
+        "request_digest": request_digest,
         "request": request.model_dump(),
         "decision_title": decision_title,
         "human_explanation": human_explanation,
