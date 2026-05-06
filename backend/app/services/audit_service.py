@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from app.database import get_db_session
-from app.models.db_models import ActionRequestDB, DecisionDB
+from app.models.db_models import ActionRequestDB, DecisionDB, InvariantCheckDB
 from app.schemas import ActionRequest, DecisionRecord
 
 
@@ -54,8 +54,25 @@ def persist_decision(
             ledger_status=record.ledger_status,
         )
 
+        invariant_rows = [
+            InvariantCheckDB(
+                trace_id=trace_id,
+                check_id=check.id,
+                name=check.name,
+                status=check.status,
+                source=check.source,
+                detail=check.detail,
+            )
+            for check in record.invariant_checks
+        ]
+
         db.add(action_row)
         db.add(decision_row)
+
+        # Ensure action_requests and decisions exist before inserting child invariant rows.
+        db.flush()
+
+        db.add_all(invariant_rows)
         db.commit()
     except Exception:
         db.rollback()

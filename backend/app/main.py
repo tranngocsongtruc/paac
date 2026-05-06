@@ -1,11 +1,10 @@
 import hashlib
 import hmac
-import re
 import time
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timezone
-from typing import Any, Deque, Dict, List, Literal
+from typing import Any, Deque, Dict, List
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -34,23 +33,23 @@ from app.services.risk_service import evaluate_injection_risk
 from app.database import init_db
 from app.services.audit_service import list_decisions_from_db, persist_decision
 
-SAFE_TEXT_RE = re.compile(r"^[A-Za-z0-9_\- .,:/@()#+]{1,120}$")
-PURPOSE_RE = re.compile(r"^[A-Za-z0-9_\- .,:/@()#+]{1,180}$")
+from app.services.catalog_service import (
+    list_agents_from_db,
+    list_policies_from_db,
+    seed_catalog_data,
+)
 
 TRACE_BUCKET: Dict[str, Deque[float]] = defaultdict(deque)
-
-Decision = Literal["allow", "block", "require_approval"]
-
-app = FastAPI(title="PAAC Backend", version="0.1.0")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    seed_catalog_data()
     yield
-
 
 app = FastAPI(
     title="PAAC API",
+    version="0.1.0",
     lifespan=lifespan,
 )
 
@@ -180,11 +179,19 @@ def logout(response: Response) -> Dict[str, str]:
 
 @app.get("/agents")
 def get_agents() -> List[Dict[str, Any]]:
+    db_agents = list_agents_from_db()
+    if db_agents:
+        return db_agents
+
     return [agent.model_dump() for agent in AGENTS]
 
 
 @app.get("/policies")
 def get_policies() -> List[Dict[str, Any]]:
+    db_policies = list_policies_from_db()
+    if db_policies:
+        return db_policies
+
     return POLICIES
 
 
